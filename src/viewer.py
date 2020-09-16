@@ -7,6 +7,12 @@ import pyrealsense2 as rs
 import open3d as o3d
 
 def main(args):
+    # Reset all devices
+    ctx = rs.context()
+    devices = ctx.query_devices()
+    for dev in devices:
+        dev.hardware_reset()
+
     # Configure depth and color streams
     pipeline = rs.pipeline()
     config = rs.config()
