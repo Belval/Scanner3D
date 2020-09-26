@@ -33,9 +33,9 @@ def main(args):
     intrinsics = depth_profile.get_intrinsics()
 
     # Point cloud acquisition
-
     pc = rs.pointcloud()
     colorizer = rs.colorizer()
+    aligner = rs.align(rs.stream.color)
 
     geometry_added = False
     pcd = None
@@ -52,7 +52,7 @@ def main(args):
         o3d.io.write_point_cloud(f"clouds/{time.time()}.pcd", pcd)
 
     while True:
-        frames = pipeline.wait_for_frames()
+        frames = aligner.process(pipeline.wait_for_frames())
         depth_frame = frames.get_depth_frame()
         color_frame = frames.get_color_frame()
 
