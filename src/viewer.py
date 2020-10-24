@@ -7,7 +7,71 @@ import cv2
 import numpy as np
 import pyrealsense2 as rs
 import open3d as o3d
+from probreg import filterreg
+from tqdm import tqdm
 from functools import partial
+
+def save_pcd(depth_image, color_image):
+    pcd = create_pcd(depth_image, color_image)
+    o3d.io.write_point_cloud(f"clouds/{time.time()}.pcd", pcd)
+
+def create_pcd(depth_image, color_image, intrinsics):
+    rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
+        o3d.geometry.Image(color_image),
+        o3d.geometry.Image(depth_image),
+        convert_rgb_to_intensity=False
+    )
+    pinhole_camera_intrinsic = o3d.camera.PinholeCameraIntrinsic(intrinsics.width, intrinsics.height, intrinsics.fx, intrinsics.fy, intrinsics.ppx, intrinsics.ppy)
+    pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd, pinhole_camera_intrinsic)
+    pcd.transform([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
+    return pcd
+
+def build_from_dir(path):
+    pcds = [o3d.io.read_point_cloud(os.path.join(path, f)) for f in os.listdir(path)]
+    
+    trans_matrices = []
+    with tqdm(total=len(pcds) - 1) as t:
+        for i, pcd in enumerate(pcds[1:]):
+            target = pcds[i]
+            target = target.select_by_index(target.remove_statistical_outlier(nb_neighbors=250, std_ratio=1.0)[1])
+            target.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
+            source = pcd
+            source = source.select_by_index(source.remove_statistical_outlier(nb_neighbors=250, std_ratio=1.0)[1])
+            source.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
+            threshold = 0.1
+            reg_p2p = o3d.registration.registration_colored_icp(
+                source, target, threshold, [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
+                #o3d.registration.TransformationEstimationPointToPlane(),
+                o3d.registration.ICPConvergenceCriteria(max_iteration = 2000)
+            )
+            if reg_p2p.fitness > 0.75:
+                trans_matrices.append(reg_p2p.transformation)
+            else:
+                raise Exception("Chain broken")
+            t.update(1)
+    
+    merge = pcds[0]
+    for i, pcd in enumerate(pcds[1:]):
+        for m in trans_matrices[:i+1]:
+            pcd.transform(m)
+        merge = merge + pcd.select_by_index(pcd.remove_statistical_outlier(nb_neighbors=250, std_ratio=0.1)[1])
+    merge = merge.select_by_index(merge.remove_statistical_outlier(nb_neighbors=250, std_ratio=1.0)[1])
+    return merge
+
+def get_transform(pcd1, pcd2):
+    target = pcd1
+    target = target.select_by_index(target.remove_statistical_outlier(nb_neighbors=250, std_ratio=1.0)[1])
+    target.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
+    source = pcd2
+    source = source.select_by_index(source.remove_statistical_outlier(nb_neighbors=250, std_ratio=1.0)[1])
+    source.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
+    threshold = 0.1
+    reg_p2p = filterreg.registration_filterreg(source, target)
+    print(reg_p2p.fitness)
+    if reg_p2p.fitness > 0.98:
+        return reg_p2p.transformation
+    else:
+        raise Exception("Chain broken")
 
 def main(args):
     # Reset all devices
@@ -15,7 +79,6 @@ def main(args):
     devices = ctx.query_devices()
     for dev in devices:
         dev.hardware_reset()
-
     time.sleep(5)
 
     # Configure depth and color streams
@@ -38,19 +101,7 @@ def main(args):
     aligner = rs.align(rs.stream.color)
 
     geometry_added = False
-    pcd = None
-
-    def save_pcd(depth_image, color_image):
-        rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
-            o3d.geometry.Image(color_image),
-            o3d.geometry.Image(depth_image),
-            convert_rgb_to_intensity=False
-        )
-        pinhole_camera_intrinsic = o3d.camera.PinholeCameraIntrinsic(intrinsics.width, intrinsics.height, intrinsics.fx, intrinsics.fy, intrinsics.ppx, intrinsics.ppy)
-        pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd, pinhole_camera_intrinsic)
-        pcd.transform([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
-        o3d.io.write_point_cloud(f"clouds/{time.time()}.pcd", pcd)
-
+    transforms = []
     while True:
         frames = aligner.process(pipeline.wait_for_frames())
         depth_frame = frames.get_depth_frame()
@@ -69,85 +120,29 @@ def main(args):
         if cv2.waitKey(1) & 0xFF == ord('q'):
             cv2.destroyAllWindows()
             break
+        
         if cv2.waitKey(1) & 0xFF == ord('s'):
             print("Saving point cloud")
-            save_pcd(depth_image, color_image)
-    
-    # ICP point cloud joining
-    def draw_registration_result(source, target, transformation):
-        source_temp = copy.deepcopy(source)
-        target_temp = copy.deepcopy(target)
-        source_temp.paint_uniform_color([1, 0.706, 0])
-        target_temp.paint_uniform_color([0, 0.651, 0.929])
-        source_temp.transform(transformation)
-        o3d.visualization.draw_geometries([source_temp, target_temp])
-    
-    def pairwise_registration(source, target):
-        print("Apply point-to-plane ICP")
-        icp_coarse = o3d.registration.registration_icp(
-            source, target, max_correspondence_distance_coarse, np.identity(4),
-            o3d.registration.TransformationEstimationPointToPlane())
-        icp_fine = o3d.registration.registration_icp(
-            source, target, max_correspondence_distance_fine,
-            icp_coarse.transformation,
-            o3d.registration.TransformationEstimationPointToPlane())
-        transformation_icp = icp_fine.transformation
-        information_icp = o3d.registration.get_information_matrix_from_point_clouds(
-            source, target, max_correspondence_distance_fine,
-            icp_fine.transformation)
-        return transformation_icp, information_icp
+            pcd = create_pcd(depth_image, color_image, intrinsics)
+            pcds.append(pcd)
+            if len(pcds) < 2:
+                continue
+            try:
+                transforms.append(get_transform(pcds[-2], pcds[-1]))
+            except Exception as ex:
+                print(ex)
+                pcds.pop()
+                print("Chain broken")
+            
+    merge = pcds[0]
+    for i, pcd in enumerate(pcds[1:]):
+        for m in transforms[:i+1]:
+            pcd.transform(m)
+        merge = merge + pcd.select_by_index(pcd.remove_statistical_outlier(nb_neighbors=250, std_ratio=0.1)[1])
+    merge = merge.select_by_index(merge.remove_statistical_outlier(nb_neighbors=250, std_ratio=1.0)[1])
 
-
-    def full_registration(pcds, max_correspondence_distance_coarse,
-                        max_correspondence_distance_fine):
-        pose_graph = o3d.registration.PoseGraph()
-        odometry = np.identity(4)
-        pose_graph.nodes.append(o3d.registration.PoseGraphNode(odometry))
-        n_pcds = len(pcds)
-        for source_id in range(n_pcds):
-            for target_id in range(source_id + 1, n_pcds):
-                transformation_icp, information_icp = pairwise_registration(
-                    pcds[source_id], pcds[target_id])
-                print("Build o3d.registration.PoseGraph")
-                if target_id == source_id + 1:  # odometry case
-                    odometry = np.dot(transformation_icp, odometry)
-                    pose_graph.nodes.append(
-                        o3d.registration.PoseGraphNode(np.linalg.inv(odometry)))
-                    pose_graph.edges.append(
-                        o3d.registration.PoseGraphEdge(source_id,
-                                                    target_id,
-                                                    transformation_icp,
-                                                    information_icp,
-                                                    uncertain=False))
-                else:  # loop closure case
-                    pose_graph.edges.append(
-                        o3d.registration.PoseGraphEdge(source_id,
-                                                    target_id,
-                                                    transformation_icp,
-                                                    information_icp,
-                                                    uncertain=True))
-        return pose_graph
-
-    pcds = [o3d.io.read_point_cloud(os.path.join("clouds", f)) for f in os.listdir("clouds")]
-    target = pcds[0]
-    target.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
-    for pcd in pcds[1:]:
-        source = pcd
-        source.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
-        threshold = 0.1
-        reg_p2p = o3d.registration.registration_icp(
-            source, target, threshold, [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
-            o3d.registration.TransformationEstimationPointToPlane(),
-            o3d.registration.ICPConvergenceCriteria(max_iteration = 20000000)
-        )
-        print(reg_p2p)
-        draw_registration_result(source, target, reg_p2p.transformation)
-        if reg_p2p.fitness > 0.75:
-            source.transform(reg_p2p.transformation)
-            target = source + target
-            target.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
-
-    pcd = target
+    o3d.visualization.draw_geometries([merge])
+    pcd = merge
     pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
 
     if args.mesh_reconstruction_method == "BPA":
