@@ -34,7 +34,8 @@ class LiveScanner(Scanner):
         self.trans_matrices = []
 
     def start(self):
-        while True:
+        window = cv2.namedWindow("3D Scanner", cv2.WINDOW_NORMAL)
+        while cv2.getWindowProperty("3D Scanner", cv2.WND_PROP_VISIBLE) >= 1:
             color_image, depth_colormap = self.camera.image_depth()
             images = np.hstack((color_image, depth_colormap))
             cv2.imshow("3D Scanner", images)
@@ -47,7 +48,7 @@ class LiveScanner(Scanner):
             if cv2.waitKey(1) & 0xFF == ord("c"):
                 self.pcds.pop()
                 self.vis.update(self.pcd)
-                break
+                continue
 
             if cv2.waitKey(1) & 0xFF == ord("s"):
                 print("Saving point cloud")
@@ -58,7 +59,7 @@ class LiveScanner(Scanner):
                     self.vis = Visualization(self.pcd, self.log_level)
                     continue
                 trans_matrix, fit = self.reg.register(self.pcds[-1], pcd)
-                if fit > 0.8:
+                if fit > 0.97:
                     logging.info(f"Cloud matched ({fit}), merging...")
                     self.trans_matrices.append(trans_matrix)
                     self.pcds.append(pcd)
@@ -71,3 +72,8 @@ class LiveScanner(Scanner):
                     self.vis.update(self.pcd)
                 else:
                     logging.warning("Chain broken, go back.")
+
+        self.camera.stop()
+        if self.vis is not None:
+            self.vis.stop()
+        cv2.destroyAllWindows()

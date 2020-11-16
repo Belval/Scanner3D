@@ -24,12 +24,13 @@ class FilterReg(BasePairReg):
         source.estimate_normals(
             search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30)
         )
-        threshold = 0.1
+        threshold = 0.01
         reg_p2p = o3d.registration.registration_icp(
             source,
             target,
             0.1,
             np.identity(4),
             o3d.registration.TransformationEstimationPointToPlane(),
+            o3d.registration.ICPConvergenceCriteria(max_iteration=100)
         )
         return reg_p2p.transformation, reg_p2p.fitness
