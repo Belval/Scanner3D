@@ -127,7 +127,6 @@ class Camera:
             depth_image = np.asanyarray(depth_frame.get_data())
             color_image = np.asanyarray(color_frame.get_data())
 
-            logging.debug("Enqueuing new frame")
             q.put(
                 (
                     color_image,

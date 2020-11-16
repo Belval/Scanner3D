@@ -10,7 +10,8 @@ from scanner3d.camera import Camera
 class Scanner(abc.ABC):
     @abc.abstractmethod
     def __init__(self, log_level):
-        self.camera = Camera(log_level=log_level)
+        self.log_level = log_level
+        self.camera = Camera(log_level=self.log_level)
 
     @abc.abstractmethod
     def start(self):

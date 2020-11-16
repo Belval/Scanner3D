@@ -55,7 +55,7 @@ class LiveScanner(Scanner):
                 if not self.pcds:
                     self.pcds.append(pcd)
                     self.pcd = pcd
-                    self.vis = Visualization(self.pcd)
+                    self.vis = Visualization(self.pcd, self.log_level)
                     continue
                 trans_matrix, fit = self.reg.register(self.pcds[-1], pcd)
                 if fit > 0.8:
