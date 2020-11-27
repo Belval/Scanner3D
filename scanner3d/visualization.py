@@ -6,6 +6,7 @@ import queue
 import logging
 from multiprocessing import Process, Manager
 
+
 class Visualization:
     def __init__(self, pcd, log_level):
         self.log_level = log_level
@@ -15,8 +16,8 @@ class Visualization:
             args=(
                 np.asarray(self.pcd.points),
                 np.asarray(self.pcd.colors),
-                np.asarray(self.pcd.normals)
-            )
+                np.asarray(self.pcd.normals),
+            ),
         )
         self.visualizer.start()
 
@@ -28,8 +29,8 @@ class Visualization:
             args=(
                 np.asarray(self.pcd.points),
                 np.asarray(self.pcd.colors),
-                np.asarray(self.pcd.normals)
-            )
+                np.asarray(self.pcd.normals),
+            ),
         )
         self.visualizer.start()
 

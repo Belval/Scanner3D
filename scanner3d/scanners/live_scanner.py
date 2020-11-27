@@ -42,7 +42,7 @@ class LiveScanner(Scanner):
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 cv2.destroyAllWindows()
-                camera.stop()
+                self.camera.stop()
                 break
 
             if cv2.waitKey(1) & 0xFF == ord("c"):

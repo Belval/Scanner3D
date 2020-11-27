@@ -13,51 +13,22 @@ from functools import partial
 
 from scanner3d.camera import Camera
 from scanner3d.registration.filterreg_pair_reg import FilterReg
+from scanner3d.registration.pose_graph_reg import PoseGraphReg
 from scanner3d.scanners.live_scanner import LiveScanner
+from scanner3d.scanners.step_scanner import StepScanner
 
 import faulthandler
 faulthandler.enable()
 
-def save_pcd(depth_image, color_image, intrinsics):
-    pcd = create_pcd(depth_image, color_image, intrinsics)
-    o3d.io.write_point_cloud(f"clouds/{time.time()}.pcd", pcd)
-
-def build_from_dir(path):
-    pcds = [o3d.io.read_point_cloud(os.path.join(path, f)) for f in os.listdir(path)]
-    
-    trans_matrices = []
-    with tqdm(total=len(pcds) - 1) as t:
-        for i, pcd in enumerate(pcds[1:]):
-            target = pcds[i]
-            target = target.select_by_index(target.remove_statistical_outlier(nb_neighbors=250, std_ratio=1.0)[1])
-            target.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
-            source = pcd
-            source = source.select_by_index(source.remove_statistical_outlier(nb_neighbors=250, std_ratio=1.0)[1])
-            source.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
-            threshold = 0.1
-            reg_p2p = o3d.registration.registration_colored_icp(
-                source, target, threshold, [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
-                #o3d.registration.TransformationEstimationPointToPlane(),
-                o3d.registration.ICPConvergenceCriteria(max_iteration = 2000)
-            )
-            if reg_p2p.fitness > 0.75:
-                trans_matrices.append(reg_p2p.transformation)
-            else:
-                raise Exception("Chain broken")
-            t.update(1)
-    
-    merge = pcds[0]
-    for i, pcd in enumerate(pcds[1:]):
-        for m in trans_matrices[:i+1]:
-            pcd.transform(m)
-        merge = merge + pcd.select_by_index(pcd.remove_statistical_outlier(nb_neighbors=250, std_ratio=0.1)[1])
-    merge = merge.select_by_index(merge.remove_statistical_outlier(nb_neighbors=250, std_ratio=1.0)[1])
-    return merge
 
 def main(args):
     logging.basicConfig(level=args.log_level)
-    scanner = LiveScanner(args.log_level, FilterReg())
-    scanner.start()
+    if args.mode == "live":
+        scanner = LiveScanner(args.log_level, FilterReg())
+        scanner.start()
+    else:
+        scanner = StepScanner(args.log_level, PoseGraphReg(0.01))
+        scanner.start()
     
     """
     pcds = [o3d.io.read_point_cloud(os.path.join("clouds", f)) for f in os.listdir("clouds")]
@@ -178,6 +149,9 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Scan a 3D object and save the mesh file")
+    parser.add_argument(
+        "--mode", type=str, nargs="?", help="Mode, should be one of live or step", default="step"
+    )
     parser.add_argument(
         "--output-file", type=str, nargs="?", help="Name of the output file", default="result.obj"
     )

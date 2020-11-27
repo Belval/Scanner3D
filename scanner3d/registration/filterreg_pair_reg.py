@@ -31,6 +31,6 @@ class FilterReg(BasePairReg):
             0.1,
             np.identity(4),
             o3d.registration.TransformationEstimationPointToPlane(),
-            o3d.registration.ICPConvergenceCriteria(max_iteration=100)
+            o3d.registration.ICPConvergenceCriteria(max_iteration=100),
         )
         return reg_p2p.transformation, reg_p2p.fitness
