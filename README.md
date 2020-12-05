@@ -2,6 +2,10 @@
 
 Using registration algorithms to reconstruct 3D objects with the SR300 camera
 
+![scanner3d](images/scanner3d.png)
+
+*Element implemented in the current project
+
 ## Interfaces
 
 The main interface uses OpenCV and as such is quite limited. Here are the implemented key bindings:
