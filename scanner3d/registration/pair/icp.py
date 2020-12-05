@@ -5,7 +5,7 @@ Uses FilterReg algorithm to match two point clouds
 import numpy as np
 import open3d as o3d
 from probreg import filterreg
-from scanner3d.registration.base_pair_reg import BasePairReg
+from scanner3d.registration.pair.base_pair_reg import BasePairReg
 
 
 class FilterReg(BasePairReg):

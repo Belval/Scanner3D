@@ -8,7 +8,7 @@ import logging
 import numpy as np
 import open3d as o3d
 
-from scanner3d.registration.group.base_group_reg import BaseGroupReg
+from scanner3d.registration.group.group.base_group_reg import BaseGroupReg
 from scanner3d.registration.pair.filterreg_pair_reg import FilterReg
 
 

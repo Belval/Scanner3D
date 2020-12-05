@@ -16,7 +16,7 @@ import open3d as o3d
 import os
 import time
 
-from scanner3d.registration.base_group_reg import BaseGroupReg
+from scanner3d.registration.group.base_group_reg import BaseGroupReg
 from scanner3d.scanners.scanner import Scanner
 from scanner3d.camera import Camera
 

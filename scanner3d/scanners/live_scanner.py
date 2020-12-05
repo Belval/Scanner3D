@@ -10,7 +10,7 @@ import logging
 
 from scanner3d.camera import Camera
 from scanner3d.scanners.scanner import Scanner
-from scanner3d.registration.base_pair_reg import BasePairReg
+from scanner3d.registration.pair.base_pair_reg import BasePairReg
 from scanner3d.visualization import Visualization
 
 
