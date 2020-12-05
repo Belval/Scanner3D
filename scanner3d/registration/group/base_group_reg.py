@@ -7,5 +7,5 @@ import abc
 
 
 class BaseGroupReg(abc.ABC):
-    def register(pcds):
+    def register(self, pcds, pair_reg=None):
         raise NotImplementedException

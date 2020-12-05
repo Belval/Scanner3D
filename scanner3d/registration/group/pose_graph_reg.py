@@ -80,7 +80,7 @@ class PoseGraphReg(BaseGroupReg):
                     )
         return pose_graph
 
-    def register(self, pcds):
+    def register(self, pcds, pair_reg=None):
         pose_graph = self.full_registration(
             pcds,
             self.max_correspondence_distance_coarse,

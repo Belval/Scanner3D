@@ -12,6 +12,7 @@ import cv2
 import logging
 import numpy as np
 import open3d as o3d
+
 import os
 import time
 
@@ -29,6 +30,8 @@ class StepScanner(Scanner):
         self.reg = registration_algorithm
         self.vis = None
         self.pcd = None
+        self.continuous_capture = False
+        self.rotated_capture = False
         self.pcds = (
             []
             if cloud_dir is None
@@ -41,8 +44,10 @@ class StepScanner(Scanner):
 
     def start(self):
         logging.info("Starting acquisition in step scanner")
-        """
+
         window = cv2.namedWindow("3D Scanner", cv2.WINDOW_NORMAL)
+        self.continuous_capture = False
+        self.rotated_capture = False
         while cv2.getWindowProperty("3D Scanner", cv2.WND_PROP_VISIBLE) >= 1:
             color_image, depth_colormap = self.camera.image_depth()
             images = np.hstack((color_image, depth_colormap))
@@ -53,19 +58,30 @@ class StepScanner(Scanner):
                 self.camera.stop()
                 break
 
+            if cv2.waitKey(1) & 0xFF == ord("r"):
+                print("Rotated capture toggled")
+
             if cv2.waitKey(1) & 0xFF == ord("c"):
                 self.pcds.pop()
                 self.vis.update(self.pcd)
                 continue
 
+            if cv2.waitKey(1) & 0xFF == ord("g"):
+                print("Continuous capture toggled")
+                self.continuous_capture = not self.continuous_capture
+
             if cv2.waitKey(1) & 0xFF == ord("s"):
                 print("Saving point cloud")
                 pcd = self.camera.pcd()
                 o3d.io.write_point_cloud(f"clouds/{time.time()}.pcd", pcd)
-        
+
+            if self.continuous_capture:
+                pcd = self.camera.pcd()
+                o3d.io.write_point_cloud(f"clouds/{time.time()}.pcd", pcd)
+
         self.camera.stop()
         cv2.destroyAllWindows()
-        """
+        return
         logging.info("Starting registration in step scanner")
         pcds = [o3d.io.read_point_cloud("clouds/" + f) for f in os.listdir("clouds/")]
         for pcd in pcds:
@@ -80,4 +96,6 @@ class StepScanner(Scanner):
             pcd.transform(trans)
             pcd_combined += pcd
 
-        o3d.visualization.draw_geometries([pcd_combined])
+        self.pcd = pcd_combined
+        o3d.visualization.draw_geometries([self.pcd])
+        self.save_point_cloud()
