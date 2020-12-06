@@ -16,6 +16,10 @@ import open3d as o3d
 import os
 import time
 
+from scanner3d.preprocess.estimate_normals import EstimateNormalsPreprocessor
+from scanner3d.preprocess.remove_outliers import RemoveOutliersPreprocessor
+from scanner3d.preprocess.downsample import DownsamplePreprocessor
+from scanner3d.preprocess.preprocessor_sequence import PreprocessorSequence
 from scanner3d.registration.group.base_group_reg import BaseGroupReg
 from scanner3d.scanners.scanner import Scanner
 from scanner3d.camera import Camera
@@ -26,12 +30,12 @@ class StepScanner(Scanner):
         self, log_level, registration_algorithm: BaseGroupReg, cloud_dir: str = None
     ):
         super(StepScanner, self).__init__(log_level)
-        # self.camera = Camera(log_level)
         self.reg = registration_algorithm
         self.vis = None
         self.pcd = None
         self.continuous_capture = False
         self.rotated_capture = False
+        self.cloud_dir = cloud_dir
         self.pcds = (
             []
             if cloud_dir is None
@@ -73,26 +77,31 @@ class StepScanner(Scanner):
             if cv2.waitKey(1) & 0xFF == ord("s"):
                 print("Saving point cloud")
                 pcd = self.camera.pcd()
-                o3d.io.write_point_cloud(f"clouds/{time.time()}.pcd", pcd)
+                if self.cloud_dir:
+                    o3d.io.write_point_cloud(f"clouds/{time.time()}.pcd", pcd)
+                self.pcds.append(pcd)
 
             if self.continuous_capture:
                 pcd = self.camera.pcd()
-                o3d.io.write_point_cloud(f"clouds/{time.time()}.pcd", pcd)
+                if self.cloud_dir:
+                    o3d.io.write_point_cloud(f"clouds/{time.time()}.pcd", pcd)
+                self.pcds.append(pcd)
 
         self.camera.stop()
         cv2.destroyAllWindows()
-        return
         logging.info("Starting registration in step scanner")
-        pcds = [o3d.io.read_point_cloud("clouds/" + f) for f in os.listdir("clouds/")]
-        for pcd in pcds:
-            pcd.estimate_normals(
-                search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30)
-            )
-        downsampled_pcds = [pcd.voxel_down_sample(voxel_size=0.01) for pcd in pcds]
-        transformations = self.reg.register(downsampled_pcds)
+
+        preprocessed_pcds = PreprocessorSequence(
+            [
+                EstimateNormalsPreprocessor(radius=0.1, max_nn=30),
+                DownsamplePreprocessor(voxel_size=0.01),
+            ]
+        ).preprocess(self.pcds)
+
+        transformations = self.reg.register(preprocessed_pcds)
 
         pcd_combined = o3d.geometry.PointCloud()
-        for pcd, trans in zip(pcds, transformations):
+        for pcd, trans in zip(self.pcds, transformations):
             pcd.transform(trans)
             pcd_combined += pcd
 

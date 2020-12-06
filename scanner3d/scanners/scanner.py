@@ -30,8 +30,8 @@ class Scanner(abc.ABC):
         self.pcd = o3d.io.read_point_cloud(path)
 
     def filter(self):
-        # Removes every 50th point
-        self.pcd = self.pcd.uniform_down_sample(100)
+        # Keep every 10th point
+        self.pcd = self.pcd.uniform_down_sample(10)
         # Empirically chosen values, should be changed
         self.pcd, _ = self.pcd.remove_statistical_outlier(
             nb_neighbors=200, std_ratio=3.0
@@ -67,29 +67,27 @@ class Scanner(abc.ABC):
 
     def generate_mesh(
         self,
-        reconstruction_method: str = "Poisson",
+        reconstruction_method: str = "BPA",
         max_triangle_count: bool = 0,
         ensure_consistency: bool = True,
     ):
-        pcd = o3d.io.read_point_cloud("1607181137.8225338.pcd")
-        pcd.estimate_normals(
+        self.pcd.estimate_normals(
             search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30)
         )
-        print(pcd.has_normals())
         if reconstruction_method == "BPA":
-            distances = pcd.compute_nearest_neighbor_distance()
+            distances = self.pcd.compute_nearest_neighbor_distance()
             avg_dist = np.mean(distances)
-            radius = 5 * avg_dist
+            radius = 1.5 * avg_dist
             mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(
-                pcd, o3d.utility.DoubleVector([radius, radius * 2])
+                self.pcd, o3d.utility.DoubleVector([radius / 2, radius, radius * 2])
             )
         elif reconstruction_method == "Poisson":
             mesh, densities = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
-                pcd
+                self.pcd
             )
             vertices_to_remove = densities < np.quantile(densities, 0.01)
             mesh.remove_vertices_by_mask(vertices_to_remove)
-            mesh = mesh.crop(pcd.get_axis_aligned_bounding_box())
+            mesh = mesh.crop(self.pcd.get_axis_aligned_bounding_box())
         else:
             raise NotImplementedError()
         if max_triangle_count > 0:

@@ -5,6 +5,7 @@ Returns a transformation and a fitness score.
 
 import abc
 
+
 class BasePairReg(abc.ABC):
     def register(pcd1, pcd2):
         raise NotImplementedException

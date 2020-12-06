@@ -1,6 +1,7 @@
 import argparse
 import logging
-
+import numpy as np
+import open3d as o3d
 from scanner3d.registration.group.pose_graph import PoseGraphReg
 from scanner3d.scanners.live_scanner import LiveScanner
 from scanner3d.scanners.step_scanner import StepScanner
@@ -16,6 +17,10 @@ def main(args):
     else:
         scanner = StepScanner(args.log_level, PoseGraphReg(0.01))
         scanner.start()
+    scanner.filter()
+    mesh = scanner.generate_mesh()
+    o3d.visualization.draw_geometries([mesh])
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Scan a 3D object and save the mesh file")

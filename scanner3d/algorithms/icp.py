@@ -11,62 +11,60 @@ from scipy.spatial.distance import cdist
 from scanner3d.exceptions import PointCloudSizeMismatch
 
 
-def best_fit_transform(source, dest):
-    if len(source) != len(dest):
+def find_transform(pcd1, pcd2):
+    if len(pcd1) != len(pcd2):
         raise
 
-    centroid_A = np.mean(A, axis=0)
-    centroid_B = np.mean(B, axis=0)
-    AA = A - centroid_A
-    BB = B - centroid_B
+    center_pcd1 = np.mean(pcd1, axis=0)
+    center_pcd2 = np.mean(pcd2, axis=0)
+    centered_pcd_1 = pcd_1 - center_pcd1
+    centered_pcd_2 = pcd_2 - center_pcd2
 
-    H = np.dot(AA.T, BB)
-    U, S, Vt = np.linalg.svd(H)
+    U, S, Vt = np.linalg.svd(np.dot(centered_pcd_1.T, centered_pcd_2))
     R = np.dot(Vt.T, U.T)
 
     if np.linalg.det(R) < 0:
         Vt[2, :] *= -1
         R = np.dot(Vt.T, U.T)
 
-    t = centroid_B.T - np.dot(R, centroid_A.T)
+    t = center_pcd2.T - np.dot(R, center_pcd1.T)
 
     T = np.identity(4)
     T[0:3, 0:3] = R
     T[0:3, 3] = t
 
-    return T, R, t
+    return transformation_matrix
 
 
 def nearest_neighbor(src, dst):
-    all_dists = cdist(src, dst, "euclidean")
-    indices = all_dists.argmin(axis=1)
-    distances = all_dists[np.arange(all_dists.shape[0]), indices]
+    dists = cdist(src, dst, "euclidean")
+    indices = dists.argmin(axis=1)
+    distances = dists[np.arange(dists.shape[0]), indices]
     return distances, indices
 
 
-def icp(A, B, init_pose=None, max_iterations=20, tolerance=0.001):
-    src = np.ones((4, A.shape[0]))
-    dst = np.ones((4, B.shape[0]))
-    src[0:3, :] = np.copy(A.T)
-    dst[0:3, :] = np.copy(B.T)
+def icp(pcd1, pcd2, max_iterations=20, tolerance=0.001):
+    source = np.ones((4, pcd1.shape[0]))
+    dest = np.ones((4, pcd2.shape[0]))
+    source[0:3, :] = np.copy(pcd1.T)
+    dest[0:3, :] = np.copy(pcd2.T)
 
-    if init_pose is not None:
-        src = np.dot(init_pose, src)
-
-    prev_error = 0
+    prev_error = None
 
     for i in range(max_iterations):
-        distances, indices = nearest_neighbor(src[0:3, :].T, dst[0:3, :].T)
+        distances, indices = nearest_neighbor(source[0:3, :].T, dest[0:3, :].T)
 
-        T, _, _ = best_fit_transform(src[0:3, :].T, dst[0:3, indices].T)
+        transformation_matrix = find_transform(source[0:3, :].T, dest[0:3, indices].T)
 
-        src = np.dot(T, src)
+        source = np.dot(transformation_matrix, source)
 
         mean_error = np.sum(distances) / distances.size
-        if abs(prev_error - mean_error) < tolerance:
+
+        if prev_error is None or abs(prev_error - mean_error) < tolerance:
             break
+
         prev_error = mean_error
 
-    T, _, _ = best_fit_transform(A, src[0:3, :].T)
+    transformation_matrix = find_transform(A, src[0:3, :].T)
 
-    return T
+    return transformation_matrix

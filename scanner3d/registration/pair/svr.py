@@ -4,8 +4,9 @@ Uses Support Vector Registration to match two point clouds
 
 import numpy as np
 import open3d as o3d
-from probreg import svr
+from probreg import l2dist_regs
 from scanner3d.registration.pair.base_pair_reg import BasePairReg
+
 
 class SVR(BasePairReg):
     def register(self, pcd1, pcd2):

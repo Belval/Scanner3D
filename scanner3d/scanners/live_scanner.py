@@ -19,7 +19,6 @@ class LiveScanner(Scanner):
         self, log_level, registration_algorithm: BasePairReg, cloud_dir: str = None
     ):
         super(LiveScanner, self).__init__(log_level)
-        self.camera = Camera(log_level)
         self.reg = registration_algorithm
         self.vis = None
         self.pcd = None
