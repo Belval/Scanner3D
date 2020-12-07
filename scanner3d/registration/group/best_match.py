@@ -8,14 +8,16 @@ import logging
 import numpy as np
 import open3d as o3d
 
-from scanner3d.registration.group.base_group_reg import BaseGroupReg
-from scanner3d.registration.pair.filterreg_pair_reg import FilterReg
+from scanner3d.registration.group import BaseGroupReg
+from scanner3d.registration.pair import FilterReg
+from scanner3d.metrics import Fitness
 
 
-class BestMatchReg(BaseGroupReg):
-    def __init__(self, pair_reg=FilterReg(), min_fit=0.97):
+class BestMatch(BaseGroupReg):
+    def __init__(self, pair_reg=FilterReg(), metric=Fitness(), min_fit=0.97):
         self.pair_reg = pair_reg
         self.min_fit = min_fit
+        self.metric = metric
 
     def register(self, pcds):
         meta_iter = 0
@@ -25,7 +27,9 @@ class BestMatchReg(BaseGroupReg):
                 for j, pcd2 in enumerate(pcds):
                     if i >= j:
                         continue
-                    trans, fit = self.pair_reg.register(pcd1, pcd2)
+                    trans = self.pair_reg.register(pcd1, pcd2)
+                    pcd1_copy = copy.deepcopy(pcd1)
+                    fit = self.metric(pcd1_copy.transform(trans), pcd2)
                     scores.append((i, j, fit, trans))
             num_list = [i for i in range(len(pcds))]
             scores.sort(key=lambda x: x[2])

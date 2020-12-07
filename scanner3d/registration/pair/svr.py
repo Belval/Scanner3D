@@ -10,5 +10,5 @@ from scanner3d.registration.pair.base_pair_reg import BasePairReg
 
 class SVR(BasePairReg):
     def register(self, pcd1, pcd2):
-        reg_p2p = l2dist_regs.registration_svr(pcd1, pcd2)
-        return reg_p2p.transformation, reg_p2p.fitness
+        reg_svr = l2dist_regs.registration_svr(pcd1, pcd2)
+        return reg_svr.transformation

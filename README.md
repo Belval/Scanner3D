@@ -49,4 +49,4 @@ optional arguments:
 
 ## Tests
 
-Most features have some level of coverage. You can run the unit tests with `python tests.py`.
+Most features have some level of coverage. You can run the unit tests with `python tests.py`. Due to the nature of 3D registration you can expect up to 20 minutes for the whole test suite to complete.

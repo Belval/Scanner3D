@@ -1,23 +1,6 @@
 from scanner3d import 
 
 def main():
-    o3d.visualization.draw_geometries(pcds)
-
-    print(pcds)
-
-    # Il ne s'agit pas d'une approche optimale puisqu'elle est O(N^2)
-    # Toutefois elle est simple à comprendre.
-    for i in range(len(pcds)):
-        pcd = pcds[i]
-        pcd = pcd.select_by_index(pcd.remove_statistical_outlier(nb_neighbors=500, std_ratio=0.1)[1])
-        pcd = pcd.voxel_down_sample(voxel_size=0.01)
-        pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
-        pcds[i] = pcd
-
-    o3d.visualization.draw_geometries(pcds)
-
-    reg_type = "fpfh"
-
     print(len(pcds))
     meta_iter = 0
     while len(pcds) > 1:

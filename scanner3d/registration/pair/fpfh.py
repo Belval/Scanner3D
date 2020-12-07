@@ -9,7 +9,10 @@ from scanner3d.registration.pair.base_pair_reg import BasePairReg
 
 class FPFH(BasePairReg):
     def register(self, pcd1, pcd2):
-        reg_p2p = o3d.registration.registration_fast_based_on_feature_matching(
-            pcd1, pcd2
+        reg_fpfh = o3d.registration.registration_fast_based_on_feature_matching(
+            pcd1,
+            pcd2,
+            o3d.registration.compute_fpfh_feature(pcd1, o3d.geometry.KDTreeSearchParamHybrid(radius=0.05, max_nn=100)),
+            o3d.registration.compute_fpfh_feature(pcd2, o3d.geometry.KDTreeSearchParamHybrid(radius=0.05, max_nn=100))
         )
-        return reg_p2p.transformation, reg_p2p.fitness
+        return reg_fpfh.transformation

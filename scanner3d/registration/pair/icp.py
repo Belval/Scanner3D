@@ -10,7 +10,7 @@ from scanner3d.registration.pair.base_pair_reg import BasePairReg
 
 class ICP(BasePairReg):
     def register(self, pcd1, pcd2):
-        reg_p2p = o3d.registration.registration_icp(
+        reg_p2pl = o3d.registration.registration_icp(
             pcd1,
             pcd2,
             0.1,
@@ -18,4 +18,4 @@ class ICP(BasePairReg):
             o3d.registration.TransformationEstimationPointToPlane(),
             o3d.registration.ICPConvergenceCriteria(max_iteration=100),
         )
-        return reg_p2p.transformation, reg_p2p.fitness
+        return reg_p2pl.transformation

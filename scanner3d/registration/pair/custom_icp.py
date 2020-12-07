@@ -8,5 +8,5 @@ from scanner3d.algorithms.icp import icp
 
 class CustomICP(BasePairReg):
     def register(self, pcd1, pcd2):
-        trans, fit = icp(pcd1, pcd2)
-        return trans, fit
+        trans = icp(pcd1, pcd2)
+        return trans

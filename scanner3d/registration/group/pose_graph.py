@@ -7,10 +7,10 @@ import logging
 import numpy as np
 import open3d as o3d
 
-from scanner3d.registration.group.base_group_reg import BaseGroupReg
+from scanner3d.registration.group import BaseGroupReg
 
 
-class PoseGraphReg(BaseGroupReg):
+class PoseGraph(BaseGroupReg):
     def __init__(self, voxel_size, pair_reg=None):
         # FIXME: Allow user to define a pair reg algorithm
         self.voxel_size = voxel_size

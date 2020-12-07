@@ -12,13 +12,10 @@ from scanner3d.exceptions import PointCloudSizeMismatch
 
 
 def find_transform(pcd1, pcd2):
-    if len(pcd1) != len(pcd2):
-        raise
-
     center_pcd1 = np.mean(pcd1, axis=0)
     center_pcd2 = np.mean(pcd2, axis=0)
-    centered_pcd_1 = pcd_1 - center_pcd1
-    centered_pcd_2 = pcd_2 - center_pcd2
+    centered_pcd_1 = pcd1 - center_pcd1
+    centered_pcd_2 = pcd2 - center_pcd2
 
     U, S, Vt = np.linalg.svd(np.dot(centered_pcd_1.T, centered_pcd_2))
     R = np.dot(Vt.T, U.T)
@@ -29,14 +26,14 @@ def find_transform(pcd1, pcd2):
 
     t = center_pcd2.T - np.dot(R, center_pcd1.T)
 
-    T = np.identity(4)
-    T[0:3, 0:3] = R
-    T[0:3, 3] = t
+    transformation_matrix = np.identity(4)
+    transformation_matrix[0:3, 0:3] = R
+    transformation_matrix[0:3, 3] = t
 
     return transformation_matrix
 
 
-def nearest_neighbor(src, dst):
+def find_nn(src, dst):
     dists = cdist(src, dst, "euclidean")
     indices = dists.argmin(axis=1)
     distances = dists[np.arange(dists.shape[0]), indices]
@@ -44,15 +41,15 @@ def nearest_neighbor(src, dst):
 
 
 def icp(pcd1, pcd2, max_iterations=20, tolerance=0.001):
-    source = np.ones((4, pcd1.shape[0]))
-    dest = np.ones((4, pcd2.shape[0]))
-    source[0:3, :] = np.copy(pcd1.T)
-    dest[0:3, :] = np.copy(pcd2.T)
+    source = np.ones((4, np.array(pcd1.points).shape[0]))
+    dest = np.ones((4, np.array(pcd2.points).shape[0]))
+    source[0:3, :] = np.copy(np.array(pcd1.points).T)
+    dest[0:3, :] = np.copy(np.array(pcd2.points).T)
 
     prev_error = None
 
     for i in range(max_iterations):
-        distances, indices = nearest_neighbor(source[0:3, :].T, dest[0:3, :].T)
+        distances, indices = find_nn(source[0:3, :].T, dest[0:3, :].T)
 
         transformation_matrix = find_transform(source[0:3, :].T, dest[0:3, indices].T)
 
@@ -65,6 +62,6 @@ def icp(pcd1, pcd2, max_iterations=20, tolerance=0.001):
 
         prev_error = mean_error
 
-    transformation_matrix = find_transform(A, src[0:3, :].T)
+    transformation_matrix = find_transform(source[0:3, :].T, dest[0:3, indices].T)
 
     return transformation_matrix
