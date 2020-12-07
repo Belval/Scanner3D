@@ -38,5 +38,6 @@ setup(
         "numpy",
         "scikit-learn",
         "hdbscan",
+        "seaborn",
     ],
 )
